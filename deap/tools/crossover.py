@@ -33,6 +33,28 @@ def cxOnePoint(ind1, ind2):
     return ind1, ind2
 
 
+def cxOnePointDeterminedLength(ind1, ind2, cut_length):
+    """Executes a one point crossover on the input :term:`sequence` individuals only at distinct positions.
+    Allowed cut positions are multiples of :term:`cut_length`.
+    The two individuals are modified in place. The resulting individuals will
+    respectively have the length of the other.
+
+    :param ind1: The first individual participating in the crossover.
+    :param ind2: The second individual participating in the crossover.
+    :param cut_length: Defining the sub-sequence length at whose multiplicity crossover cuts are allowed
+    :returns: A tuple of two individuals.
+
+    This function uses the :func:`~random.randint` function from the
+    python base :mod:`random` module.
+    """
+    size = min(len(ind1), len(ind2))
+    cxpoint = random.randint(1, size - 1)
+    cxpoint = min(max(1, round(cxpoint / cut_length) * cut_length), size -1)
+    ind1.data[cxpoint:], ind2.data[cxpoint:] = ind2.data[cxpoint:], ind1.data[cxpoint:]
+
+    return ind1, ind2
+
+
 def cxTwoPoint(ind1, ind2):
     """Executes a two-point crossover on the input :term:`sequence`
     individuals. The two individuals are modified in place and both keep
@@ -292,6 +314,9 @@ def cxSimulatedBinaryBounded(ind1, ind2, eta, low, up):
     individuals. The simulated binary crossover expects :term:`sequence`
     individuals of floating point numbers.
 
+    In case ind1 and ind2 have entries that exceed the lower and upper bounds, they get bound before executing the
+    crossover.
+
     :param ind1: The first individual participating in the crossover.
     :param ind2: The second individual participating in the crossover.
     :param eta: Crowding degree of the crossover. A high eta will produce
@@ -325,26 +350,29 @@ def cxSimulatedBinaryBounded(ind1, ind2, eta, low, up):
             # This epsilon should probably be changed for 0 since
             # floating point arithmetic in Python is safer
             if abs(ind1[i] - ind2[i]) > 1e-14:
-                x1 = min(ind1[i], ind2[i])
-                x2 = max(ind1[i], ind2[i])
+                x1 = min(max(min(ind1[i], ind2[i]), xl), xu)  # already apply bounds here
+                x2 = min(max(max(ind1[i], ind2[i]), xl), xu)  # already apply bounds here
                 rand = random.random()
+                delta = np.array(x2 - x1)
+                delta[delta == 0.0] = EPS
+                delta = float(delta)
 
-                beta = 1.0 + (2.0 * (x1 - xl) / (x2 - x1))
-                alpha = 2.0 - beta ** -(eta + 1)
+                beta = 1.0 + (2.0 * (x1 - xl) / delta)
+                alpha = 2.0 - (beta ** (-(eta + 1)))
                 if rand <= 1.0 / alpha:
                     beta_q = (rand * alpha) ** (1.0 / (eta + 1))
                 else:
                     beta_q = (1.0 / (2.0 - rand * alpha)) ** (1.0 / (eta + 1))
 
-                c1 = 0.5 * (x1 + x2 - beta_q * (x2 - x1))
+                c1 = 0.5 * ((x1 + x2) - beta_q * delta)
 
-                beta = 1.0 + (2.0 * (xu - x2) / (x2 - x1))
-                alpha = 2.0 - beta ** -(eta + 1)
+                beta = 1.0 + (2.0 * (xu - x2) / delta)
+                alpha = 2.0 - (beta ** (-(eta + 1)))
                 if rand <= 1.0 / alpha:
                     beta_q = (rand * alpha) ** (1.0 / (eta + 1))
                 else:
                     beta_q = (1.0 / (2.0 - rand * alpha)) ** (1.0 / (eta + 1))
-                c2 = 0.5 * (x1 + x2 + beta_q * (x2 - x1))
+                c2 = 0.5 * ((x1 + x2) + beta_q * delta)
 
                 c1 = min(max(c1, xl), xu)
                 c2 = min(max(c2, xl), xu)
